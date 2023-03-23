@@ -183,6 +183,48 @@ public class TestModularLayer extends AbstractLuceneDistributionTest {
             });
   }
 
+  /** Checks that Lucene Core is a MR-JAR and has Panama foreign classes */
+  @Test
+  public void testMultiReleaseJar() {
+    ModuleLayer bootLayer = ModuleLayer.boot();
+    Assertions.assertThatNoException()
+        .isThrownBy(
+            () -> {
+              String coreModuleId = "org.apache.lucene.core";
+
+              Configuration configuration =
+                  bootLayer
+                      .configuration()
+                      .resolve(
+                          luceneCoreAndThirdPartyModulesFinder,
+                          ModuleFinder.of(),
+                          List.of(coreModuleId));
+
+              ModuleLayer layer =
+                  bootLayer.defineModulesWithOneLoader(
+                      configuration, ClassLoader.getSystemClassLoader());
+
+              ClassLoader loader = layer.findLoader(coreModuleId);
+
+              final Set<Integer> jarVersions = Set.of(19, 20);
+              for (var v : jarVersions) {
+                Assertions.assertThat(
+                        loader.getResource(
+                            "META-INF/versions/"
+                                + v
+                                + "/org/apache/lucene/store/MemorySegmentIndexInput.class"))
+                    .isNotNull();
+              }
+
+              final int runtimeVersion = Runtime.version().feature();
+              if (jarVersions.contains(Integer.valueOf(runtimeVersion))) {
+                Assertions.assertThat(
+                        loader.loadClass("org.apache.lucene.store.MemorySegmentIndexInput"))
+                    .isNotNull();
+              }
+            });
+  }
+
   /** Make sure we don't publish automatic modules. */
   @Test
   public void testAllCoreModulesAreNamedModules() {
